@@ -35,7 +35,7 @@ async function logToSheet(type) {
   if (type === "IN") {
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "Time Log!A:E",
+      range: "Clock Log!A:E",
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [[date, "", time, "", ""]] },
     });
@@ -45,7 +45,7 @@ async function logToSheet(type) {
   if (type === "OUT") {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "Time Log!A:E",
+      range: "Clock Log!A:E",
     });
     const rows = res.data.values || [];
 
