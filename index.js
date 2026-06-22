@@ -28,9 +28,9 @@ function nowDate(tz) {
 
 async function logToSheet(type) {
   const sheets = google.sheets({ version: "v4", auth });
-  const tz     = process.env.TIMEZONE || "America/New_York";
-  const time   = nowTime(tz);
-  const date   = nowDate(tz);
+  const tz = process.env.TIMEZONE || "America/New_York";
+  const time = nowTime(tz);
+  const date = nowDate(tz);
 
   if (type === "IN") {
     await sheets.spreadsheets.values.append({
@@ -43,7 +43,7 @@ async function logToSheet(type) {
   }
 
   if (type === "OUT") {
-    const res  = await sheets.spreadsheets.values.get({
+    const res = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
       range: "Clock Log!A:E",
     });
@@ -62,3 +62,32 @@ async function logToSheet(type) {
 
     await sheets.spreadsheets.values.update({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      range: `Clock Log!D${targetRow}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[time]] },
+    });
+    return `✅ Clocked out at ${time}`;
+  }
+
+  return `⚠️ Just send IN or OUT — that's it!`;
+}
+
+app.post("/webhook", async (req, res) => {
+  const body = (req.body.Body || "").trim().toUpperCase();
+  const twiml = new twilio.twiml.MessagingResponse();
+
+  try {
+    const reply = await logToSheet(body);
+    twiml.message(reply);
+  } catch (err) {
+    console.error("❌ Error:", err.message);
+    twiml.message("⚠️ Something went wrong. Check your server logs.");
+  }
+
+  res.type("text/xml").send(twiml.toString());
+});
+
+app.get("/", (req, res) => res.send("WhatsApp clock logger running ✅"));
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Listening on port ${PORT}`));
