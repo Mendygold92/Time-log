@@ -26,16 +26,16 @@ function nowDate(tz) {
   });
 }
 
-async function logToSheet(type) {
+async function logToSheet(type, parts) {
   const sheets = google.sheets({ version: "v4", auth });
-  const tz = process.env.TIMEZONE || "America/New_York";
-  const time = nowTime(tz);
-  const date = nowDate(tz);
+  const tz     = process.env.TIMEZONE || "America/New_York";
+  const time   = nowTime(tz);
+  const date   = nowDate(tz);
 
   if (type === "IN") {
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "Clock Log!A:E",
+      range: "Time Log!A:E",
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [[date, "", time, "", ""]] },
     });
@@ -43,9 +43,9 @@ async function logToSheet(type) {
   }
 
   if (type === "OUT") {
-    const res = await sheets.spreadsheets.values.get({
+    const res  = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "Clock Log!A:E",
+      range: "Time Log!A:E",
     });
     const rows = res.data.values || [];
 
@@ -62,22 +62,44 @@ async function logToSheet(type) {
 
     await sheets.spreadsheets.values.update({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: `Clock Log!D${targetRow}`,
+      range: `Time Log!D${targetRow}`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [[time]] },
     });
     return `✅ Clocked out at ${time}`;
   }
 
-  return `⚠️ Just send IN or OUT — that's it!`;
+  const hours  = parts[0] || "";
+  const client = parts[1] || "";
+  const memo   = parts[2] || "";
+
+  if (!hours || !client) {
+    return `⚠️ Format: hours | client | memo\nExample: 3.5 | Acme Corp | reviewed contracts`;
+  }
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: "Client Log!A:E",
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[date, client, hours, memo, time]] },
+  });
+
+  return `✅ Logged ${hours}hrs for ${client}`;
 }
 
 app.post("/webhook", async (req, res) => {
-  const body = (req.body.Body || "").trim().toUpperCase();
+  const body  = (req.body.Body || "").trim();
+  const upper = body.toUpperCase();
   const twiml = new twilio.twiml.MessagingResponse();
 
   try {
-    const reply = await logToSheet(body);
+    let reply;
+    if (upper === "IN" || upper === "OUT") {
+      reply = await logToSheet(upper, []);
+    } else {
+      const parts = body.split("|").map(s => s.trim());
+      reply = await logToSheet("CLIENT", parts);
+    }
     twiml.message(reply);
   } catch (err) {
     console.error("❌ Error:", err.message);
