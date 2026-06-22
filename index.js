@@ -97,7 +97,7 @@ app.post("/webhook", async (req, res) => {
     if (upper === "IN" || upper === "OUT") {
       reply = await logToSheet(upper, []);
     } else {
-      const parts = body.split("|").map(s => s.trim());
+      const parts = body.split(",").map(s => s.trim());
       reply = await logToSheet("CLIENT", parts);
     }
     twiml.message(reply);
